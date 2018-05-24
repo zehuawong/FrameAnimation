@@ -4,11 +4,38 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".MainActivity">
+    android:orientation="vertical"
+    tools:context=".MainActivity"
+    android:gravity="center|center_horizontal|center_vertical" >
 
-<com.wang.frameanimationtest.FrameAnimationView
-    android:id="@+id/frame_animation_view"
-    android:layout_width="400dp"
-    android:layout_height="400dp" />
+    <com.wang.frameanimationtest.FrameAnimationView
+        android:id="@+id/frame_animation_view"
+        android:layout_width="400dp"
+        android:layout_height="400dp" />
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+
+        android:gravity="center|center_horizontal|center_vertical" >
+        <Button
+            android:id="@+id/start_btn"
+            android:layout_width="100dp"
+            android:layout_height="wrap_content"
+            android:layout_marginRight="10dp"
+            android:text="开始"/>
+        <Button
+            android:id="@+id/stop_btn"
+            android:layout_width="100dp"
+            android:layout_height="wrap_content"
+            android:layout_marginRight="10dp"
+            android:text="暂停"/>
+        <Button
+            android:id="@+id/restart_btn"
+            android:layout_width="100dp"
+            android:layout_height="wrap_content"
+            android:text="继续"/>
+    </LinearLayout>
+
 
 </LinearLayout>

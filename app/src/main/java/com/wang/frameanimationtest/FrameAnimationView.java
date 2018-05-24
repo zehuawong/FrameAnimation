@@ -13,12 +13,14 @@ import android.view.KeyEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 
-public class FrameAnimationView extends SurfaceView implements SurfaceHolder.Callback,Runnable{
+import java.util.Timer;
+import java.util.TimerTask;
+
+public class FrameAnimationView extends SurfaceView implements SurfaceHolder.Callback {
 
     final private static String TAG="FrameAnimationView";
     private SurfaceHolder mSurfaceHolder;
-    private boolean mIsThreadRunning=true; //线程运行开关
-    private static boolean mIsDestroy=false; //是否已经销毁
+
     private int[] mBitmapSrcIDs; // 用于播放动画的图片资源id数组
     private int totalCount; //图片资源总数
 
@@ -28,10 +30,11 @@ public class FrameAnimationView extends SurfaceView implements SurfaceHolder.Cal
     private int mCurIndex; //当前图片的位置
     private int mGapTime=150; //每帧动画持续存在的时间，默认值
 
-    private boolean IsRepeat=false;
+    private boolean isRepeat=false; //设置是否重复播放动画
 
     FrameAnimationListener mframeAnimationListener; //动画监听器
 
+    private Timer mTimer; //计时器控制帧延时
 
     public FrameAnimationView(Context context) {
        this(context,null);
@@ -59,98 +62,27 @@ public class FrameAnimationView extends SurfaceView implements SurfaceHolder.Cal
 
     @Override
     public void surfaceCreated(SurfaceHolder holder) {
-
+        start();
+        Log.d(TAG, "surfaceCreated: ");
     }
 
     @Override
     public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-
+        Log.d(TAG, "surfaceChanged: ");
     }
 
     @Override
     public void surfaceDestroyed(SurfaceHolder holder) {
-        mIsThreadRunning=false;
+        Log.d(TAG, "surfaceDestroyed: ");
+        stop();
     }
 
-    @Override
-    public void run() {
 
-        if(mframeAnimationListener!=null){
-           // mframeAnimationListener.onStart();
-        }
-        //每隔mGapTime时间刷新屏幕
-        while (mIsThreadRunning){
-            drawView();
-            try {
-                Thread.sleep(mGapTime);
-            }catch (Exception e){
-                e.printStackTrace();
-            }
-
-        }
-
-        if(mframeAnimationListener!=null){
-            mframeAnimationListener.onStop();
-        }
-    }
 
     //设置动画资源图片素材的id
     public void setBitmapSrcIDs(int[] bitmapSrcIDs){
         this.mBitmapSrcIDs=bitmapSrcIDs;
         totalCount=bitmapSrcIDs.length;
-    }
-
-    //绘图方法
-    private void drawView(){
-        // 无图片资源文件退出
-        if (mBitmapSrcIDs==null ||mBitmapSrcIDs.length<=0){
-            Log.e(TAG, "drawView: the bitmapsrcIDs is null");
-            mIsThreadRunning = false;
-            return;
-        }
-        // 锁定画布
-        if(mSurfaceHolder != null){
-            mCanvas = mSurfaceHolder.lockCanvas();
-        }
-        try {
-            if(mSurfaceHolder!=null && mCanvas!=null){
-                mCanvas.drawColor(Color.WHITE);
-                mBitmap= BitmapFactory.decodeResource(getResources(),mBitmapSrcIDs[mCurIndex]);
-                Paint paint=new Paint();
-                paint.setAntiAlias(true);
-                paint.setStyle(Paint.Style.STROKE);
-                Rect mSrcRect, mDestRect;
-                mSrcRect = new Rect(0, 0, mBitmap.getWidth(), mBitmap.getHeight());
-                mDestRect = new Rect(0, 0, getWidth(), getHeight());
-                mCanvas.drawBitmap(mBitmap, mSrcRect, mDestRect, paint);
-
-                if (mCurIndex == totalCount - 1) {
-                    //如果播放到最后一张，当前index置零
-                    mCurIndex = 0;
-                }
-
-            }
-        }catch (Exception e){
-            e.printStackTrace();
-        }finally {
-            mCurIndex++;
-            if(mCurIndex>=totalCount){
-                mCurIndex=0;
-            }
-            if(mCanvas!=null){
-                // 将画布解锁并显示在屏幕上
-                if(mSurfaceHolder!=null){
-                    mSurfaceHolder.unlockCanvasAndPost(mCanvas);
-                }
-            }
-
-            if (mBitmap != null) {
-                //回收图片
-                mBitmap.recycle();
-            }
-
-        }
-
     }
 
     //设置每帧动画时间
@@ -163,36 +95,119 @@ public class FrameAnimationView extends SurfaceView implements SurfaceHolder.Cal
         this.mframeAnimationListener = mframeAnimationListener;
     }
 
+    //设置是否重复播放
+    public void setRepeat(boolean repeat){
+        this.isRepeat=repeat;
+    }
 
     /**
      * 开始动画
      */
-    public void start() {
-        if (!mIsDestroy) {
-            mCurIndex = 0;
-            mIsThreadRunning = true;
-            new Thread(this).start();  //改：使用timer计时器
-        } else {
-            // 如果SurfaceHolder已经销毁抛出该异常
-            try {
-                throw new Exception("IllegalArgumentException: SurfaceHolder is not destroyed");
-            } catch (Exception e) {
-                e.printStackTrace();
+    public void start(){
+        stop();
+        mCurIndex = 0;
+        mTimer=new Timer();
+        if(mframeAnimationListener!=null)
+            mframeAnimationListener.onStart();
+
+        mTimer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+
+                drawView();
+
             }
+        },0,mGapTime);
+
+    }
+
+    /**
+     * 停止动画
+     */
+    public void stop(){
+        if(mTimer!=null){
+            mTimer.cancel();
+            mTimer=null;
         }
     }
 
-
-
-    //继续动画
+    /**
+     * 继续动画
+     */
     public void restart(){
-        mIsThreadRunning=true;
+        mTimer=new Timer();
+        mTimer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+
+                drawView();
+
+            }
+        },0,mGapTime);
     }
 
-    //结束动画
-    public void stop(){
-        mIsThreadRunning=false;
+
+    //绘图方法
+    private void drawView(){
+
+        synchronized (this){
+            // 无图片资源文件退出
+            if (mBitmapSrcIDs==null ||mBitmapSrcIDs.length<=0){
+                Log.e(TAG, "drawView: the bitmapsrcIDs is null");
+                stop();
+                return;
+            }
+            // 锁定画布
+            if(mSurfaceHolder != null){
+                mCanvas = mSurfaceHolder.lockCanvas();
+            }
+            try {
+
+                if(mSurfaceHolder!=null && mCanvas!=null&&mCurIndex<totalCount){
+                    mCanvas.drawColor(Color.WHITE);
+                    mBitmap= BitmapFactory.decodeResource(getResources(),mBitmapSrcIDs[mCurIndex]);
+                    Paint paint=new Paint();
+                    paint.setAntiAlias(true);
+                    paint.setStyle(Paint.Style.STROKE);
+                    Rect mSrcRect, mDestRect;
+                    mSrcRect = new Rect(0, 0, mBitmap.getWidth(), mBitmap.getHeight());
+                    mDestRect = new Rect(0, 0, getWidth(), getHeight());
+                    mCanvas.drawBitmap(mBitmap, mSrcRect, mDestRect, paint);
+
+                }
+            }catch (Exception e){
+                e.printStackTrace();
+            }finally {
+                mCurIndex++;
+                if(mCurIndex>=totalCount){ //如果播放到最后一张
+
+                    if(isRepeat){    //如果设置了重复播放，当前index置零
+                        mCurIndex=0;
+                    }
+                    else {  //否则结束动画
+                        stop();
+                        if(mframeAnimationListener!=null)
+                            mframeAnimationListener.onStop();
+                    }
+
+                }
+                if(mCanvas!=null){
+                    // 将画布解锁并显示在屏幕上
+                    if(mSurfaceHolder!=null){
+                        mSurfaceHolder.unlockCanvasAndPost(mCanvas);
+                    }
+                }
+
+                if (mBitmap != null) {
+                    //回收图片
+                    mBitmap.recycle();
+                }
+
+            }
+        }
+
     }
+
 
     //动画监听器
     public interface FrameAnimationListener{
@@ -209,7 +224,7 @@ public class FrameAnimationView extends SurfaceView implements SurfaceHolder.Cal
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         // 当按返回键时，将线程停止，避免surfaceView销毁了,而线程还在运行而报错
         if (keyCode == KeyEvent.KEYCODE_BACK) {
-            mIsThreadRunning = false;
+           stop();
         }
         return super.onKeyDown(keyCode, event);
     }
